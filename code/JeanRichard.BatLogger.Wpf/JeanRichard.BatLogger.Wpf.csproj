@@ -15,7 +15,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>x64</PlatformTarget>
+    <PlatformTarget>x86</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -40,8 +40,9 @@
     <Reference Include="MapControl.WPF">
       <HintPath>packages\XAML.MapControl.1.12.0\lib\net45\MapControl.WPF.dll</HintPath>
     </Reference>
-    <Reference Include="swisstopoReframeLib">
-      <HintPath>..\lib\ReFrame\swisstopoReframeLib.dll</HintPath>
+    <Reference Include="swisstopoReframeLib, Version=2.0.0.0, Culture=neutral, PublicKeyToken=a6ca582d0a01a070, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\ReFrame\x86\swisstopoReframeLib.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -63,9 +64,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Domain\LoggerLocation.cs" />
     <Compile Include="ViewModels\BaseViewModel.cs" />
     <Compile Include="ViewModels\BatLocationModel.cs" />
-    <Compile Include="BatSighting.cs" />
+    <Compile Include="Domain\BatCall.cs" />
     <Compile Include="SwissMapTileSource.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

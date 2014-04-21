@@ -1,51 +1,60 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using JeanRichard.BatLogger.Wpf.Domain;
 using MapControl;
 
 namespace JeanRichard.BatLogger.Wpf.ViewModels
 {
+	public class BatCallModel : BaseViewModel
+	{
+		public BatCallModel()
+		{}
+
+		public DateTime SlotTime { get; set; }
+	}
+
 	public class BatLocationModel : BaseViewModel
 	{
-		private readonly IEnumerable<BatSighting> _sightings;
-
-		public IEnumerable<BatSighting> Sightings
-		{
-			get { return _sightings; }
-		}
+		private readonly LoggerLocation _loggerLocation;
 
 		private readonly BatModel _parentModel;
-		private int _callCount;
+		private IEnumerable<BatCallModel> _calls;
+		private BatCallModel _currentCall;
 
-		public BatLocationModel(IEnumerable<BatSighting> sightings, BatModel parentModel)
+		public BatLocationModel(LoggerLocation location, BatModel parentModel)
 		{
-			_sightings = sightings;
+			_loggerLocation = location;
 			_parentModel = parentModel;
 			_parentModel.PropertyChanged += (sender, args) =>
 			{
-				if (args.PropertyName.Equals("TimeWindowStart"))
+				if (args.PropertyName.Equals("CurrentSlotTime"))
 				{
 					UpdateFields();
 				}
 			};
 		}
 
+		public IEnumerable<BatCallModel> Calls
+		{
+			get { return _calls; }
+		}
+
+		public BatCallModel CurrentCall
+		{
+			set
+			{
+				_currentCall = value;
+				OnPropertyChanged();
+			}
+			get { return _currentCall; }
+		}
+
 		public Location Location { get; set; }
 
 		public void UpdateFields()
 		{
-			DateTime endDate = _parentModel.TimeWindowStart.Add(_parentModel.TimeWindowsSize);
-			CallCount = _sightings.Count(s => s.Time >= _parentModel.TimeWindowStart && s.Time < endDate);
-		}
-
-		public int CallCount
-		{
-			get { return _callCount; }
-			set
-			{
-				_callCount = value;
-				OnPropertyChanged();
-			}
+			_currentCall = _calls.FirstOrDefault(c => c.SlotTime == _parentModel.CurrentSlotTime);
 		}
 	}
 }

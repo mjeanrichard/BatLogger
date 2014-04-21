@@ -2,7 +2,7 @@ using System;
 
 namespace JeanRichard.BatLogger.Wpf
 {
-	public class BatSighting
+	public class BatCall
 	{
 		public DateTime Time { get; set; }
 		public int Frequency { get; set; }
