@@ -1,19 +1,24 @@
 //#define DEBUG
+//#define RTC_ENABLED
 
-#include <Wire.h>
-#include "RTClib.h"
-#include <SD.h>
+#include <SdFat.h>
+SdFat sd;
 
-RTC_DS1307 RTC;
+#ifdef RTC_ENABLED
+  #include <Wire.h>
+  #include "RTClib.h"
+  RTC_DS1307 RTC;
+#endif
+
 
 //Board configuration
 const int BatInputPin = 2;
 const int Button1Pin = 8;
 const int Button2Pin = 9;
 
+const int GreenLedPin = 5;
 const int YellowLedPin = 6;
 const int RedLedPin = 7;
-const int GreenLedPin = 5;
 
 const int SDShieldSwitchPin = 3;
 const int SDPin = 10;
@@ -21,65 +26,62 @@ const int SDPin = 10;
 //Time of Silence to detect End of Call in microseconds
 const int CallEndTimeout = 5000;
 
-// Anzahl Datensaetze die im speicher gehalten werden, bevor auf die Karte geschrieben wird.
-const byte LogBufferSize = 10;
-
+// Interrupt Variablen um BatInputs zu zählen
+volatile int pulses = 0;
 volatile unsigned long callStartMicro;
 volatile unsigned long callStartMillis;
 volatile unsigned long lastCallMicro;
 
-
+// Anzahl Datensaetze die im speicher gehalten werden, bevor auf die Karte geschrieben wird.
+const byte LogBufferSize = 10;
 //index auf die aktuelle Buffer position
 byte index = 0;
 byte pulseStore[LogBufferSize];
 unsigned int durationStore[LogBufferSize];
 unsigned long startTimeStore[LogBufferSize];
 
-char filename[] = "LOG00.CSV";
+char filename[] = "LOG--.CSV";
 
-// Interrupt Variable um BatInputs zu zählen
-volatile int pulses = 0;
-
-void setup(){
-
+void setup()
+{
   pinMode(BatInputPin, INPUT);
   pinMode(Button1Pin, INPUT);
+  digitalWrite(Button1Pin, HIGH);
   pinMode(Button2Pin, INPUT);
+  digitalWrite(Button2Pin, HIGH);
   pinMode(YellowLedPin, OUTPUT);
   pinMode(RedLedPin, OUTPUT);
   pinMode(GreenLedPin, OUTPUT);
   pinMode(SDShieldSwitchPin, OUTPUT);
   analogReference( DEFAULT );
 
-  #ifdef DEBUG
-    Serial.begin(57600);
-  #endif
+#ifdef DEBUG
+  Serial.begin(57600);
+#endif
 
-  initSdCard();
+  attachInterrupt(0, callInterrupt, CHANGE); 
 
-  attachInterrupt(0, count, CHANGE); 
-  
+  SdFile file = openLogFile();
+  file.println("#StartUp completed");
+  closeLogFile(file);
+
   indicatorMode();
 }
 
-void loop(){
+void loop()
+{
   pulses = 0;
 
   int tempPulses = 0;
   while(pulses == 0 || pulses > tempPulses || (micros() - lastCallMicro) < CallEndTimeout){
     if (digitalRead(Button2Pin) == LOW){
-      writeLog();
+      writeBufferToLog();
       indicatorMode();
     }
     tempPulses = pulses;
     delay(1);
   }
-  
-  #ifdef DEBUG
-    Serial.print(F("Free Ram: "));
-    Serial.println(freeRam());
-  #endif
-  
+
   digitalWrite(GreenLedPin, LOW);
   int diff = lastCallMicro - callStartMicro;
   if (tempPulses > 1 && diff > 0)
@@ -93,19 +95,14 @@ void loop(){
 
       index++;
       if (index >= LogBufferSize){
-        writeLog();
+        writeBufferToLog();
       } 
     }
   }
 }
 
-void setLeds(int green, int yellow, int red){
-  digitalWrite(GreenLedPin, green);
-  digitalWrite(YellowLedPin, yellow);
-  digitalWrite(RedLedPin, red);
-}
-
-void indicatorMode(){
+void indicatorMode()
+{
   boolean abort = false;
 
   setLeds(LOW, LOW, HIGH);
@@ -129,7 +126,8 @@ void indicatorMode(){
     }
     else if (diff < 300){
       setLeds(LOW, LOW, HIGH);
-    } else {
+    } 
+    else {
       setLeds(LOW, LOW, LOW);
     }
     abort = digitalRead(Button1Pin) == LOW;
@@ -143,12 +141,10 @@ void indicatorMode(){
   setLeds(LOW, LOW, LOW);
 }
 
-
-void writeLog(){
-  digitalWrite(YellowLedPin, HIGH);
-  digitalWrite(SDShieldSwitchPin, HIGH);
-  delay(500);
-  File logfile = SD.open(filename, FILE_WRITE); 
+// == Writes the Memory-Buffer to the LogFile and clears the Buffer.
+void writeBufferToLog()
+{
+  SdFile logfile = openLogFile();
   for (int i = 0; i < index; i++){
     logfile.print(startTimeStore[i]);
     logfile.print(';');
@@ -156,21 +152,12 @@ void writeLog(){
     logfile.print(';');
     logfile.println(durationStore[i]);
   }
-  logfile.close();
-
+  closeLogFile(logfile);
   index = 0;
-  digitalWrite(SDShieldSwitchPin, LOW);
-  digitalWrite(YellowLedPin, LOW);
 }
 
-int freeRam () 
-{
-  extern int __heap_start, *__brkval; 
-  int v; 
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
-}
-
-void count()
+// == Interrupt Method to count Bat-Calls
+void callInterrupt()
 {
   if (pulses == 0)
   {
@@ -181,56 +168,73 @@ void count()
   pulses++;
 }
 
-
-void initSdCard()
-{
+// == Opens the Logfile (and initializes if new)
+SdFile openLogFile(){
   digitalWrite(YellowLedPin, HIGH);
   digitalWrite(SDShieldSwitchPin, HIGH);
-  delay(500);
+  delay(200);
 
-  Wire.begin();
+  if (!sd.begin(SDPin, SPI_FULL_SPEED)){
+    error(3);
+  }
+
+  SdFile logfile;
+  if (!sd.exists(filename)) {
+    logfile = initializeNewLog();
+  } 
+  else if (!logfile.open(filename, O_RDWR | O_CREAT | O_AT_END)) {
+    error(4);
+  } 
+  return logfile;
+}
+
+// == Closes LogFile and turns the LED and the SD Module off.
+void closeLogFile(SdFile logfile)
+{
+  logfile.close();
+  delay(200);
+  digitalWrite(SDShieldSwitchPin, LOW);
+  digitalWrite(YellowLedPin, LOW);
+}
+
+// == Initializese a new LogFile with Headers.
+SdFile initializeNewLog()
+{
+  SdFile logfile;
+  for (int i = 0; i < 100; i++) {
+    filename[3] = i/10 + '0';
+    filename[4] = i%10 + '0';
+    if (!sd.exists(filename)) {
+      if (!logfile.open(filename, O_RDWR | O_CREAT | O_AT_END)) {
+        error(4);
+      } 
+      break;
+    }
+  }
+
+#ifdef RTC_ENABLED
   RTC.begin();
 
   if (! RTC.isrunning()) {
     error(1);
   }
+#endif
 
-  pinMode(SDPin, OUTPUT);
-  if (!SD.begin(SDPin)) {
-    error(3);
-  }
-
-  File logfile;
-  for (int i = 0; i < 100; i++) {
-    filename[3] = i/10 + '0';
-    filename[4] = i%10 + '0';
-    if (!SD.exists(filename)) {
-      logfile = SD.open(filename, FILE_WRITE); 
-      break;
-    }
-  }
-
-  if (!logfile) {
-    error(4);
-  }
-
-  DateTime now = RTC.now();
   unsigned long nowMillis = millis();
-
   char buffer[150];
-  sprintf_P(buffer, PSTR("%lu;%02d/%02d/%02d %02d:%02d:%02d"), nowMillis, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+
+#ifdef RTC_ENABLED
+  DateTime now = RTC.now();
+  sprintf_P(buffer, PSTR("#%lu;%02d/%02d/%02d %02d:%02d:%02d"), nowMillis, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
   logfile.println(buffer);
-  
-  sprintf_P(buffer, PSTR("start time;pulses;duration"));
+#endif
+
+  sprintf_P(buffer, PSTR("#start time;pulses;duration"));
   logfile.println(buffer);
-  
-  logfile.close();
-  digitalWrite(SDShieldSwitchPin, LOW);
-  digitalWrite(YellowLedPin, LOW);
+  return logfile;
 }
 
-
-
+// == Stops PrgrammExecution and Reports the ErrorCode with the red LED
 void error(int code){
   while(true)
   {
@@ -243,4 +247,13 @@ void error(int code){
     delay(2000);
   };
 }
+
+// == Helper Method to Set the State of all LEDs
+void setLeds(int green, int yellow, int red){
+  digitalWrite(GreenLedPin, green);
+  digitalWrite(YellowLedPin, yellow);
+  digitalWrite(RedLedPin, red);
+}
+
+
 
