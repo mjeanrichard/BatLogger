@@ -64,11 +64,28 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Domain\LoggerLocation.cs" />
+    <Compile Include="Controls\BatLocationPanel.xaml.cs">
+      <DependentUpon>BatLocationPanel.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\TimeLine.xaml.cs">
+      <DependentUpon>TimeLine.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\TimeLinePanel.cs" />
+    <Compile Include="Domain\LogSessionLocation.cs" />
+    <Compile Include="Domain\LogImporter.cs" />
     <Compile Include="ViewModels\BaseViewModel.cs" />
     <Compile Include="ViewModels\BatLocationModel.cs" />
     <Compile Include="Domain\BatCall.cs" />
     <Compile Include="SwissMapTileSource.cs" />
+    <Compile Include="ViewModels\BatModelDesign.cs" />
+    <Page Include="Controls\BatLocationPanel.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Controls\TimeLine.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

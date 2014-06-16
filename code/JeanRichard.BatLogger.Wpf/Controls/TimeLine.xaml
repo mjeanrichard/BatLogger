@@ -1,0 +1,36 @@
+﻿<UserControl x:Class="JeanRichard.BatLogger.Wpf.Controls.TimeLine"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:JeanRichard.BatLogger.Wpf.Controls"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="300">
+    <Grid x:Name="LayoutRoot">
+        <ListBox Margin="0" Padding="0" BorderThickness="0"
+                 ItemsSource="{Binding Path=InternalItemsSource}" 
+                 SelectedItem="{Binding Path=SelectedItem, RelativeSource={RelativeSource FindAncestor, AncestorType=controls:TimeLine, AncestorLevel=1}}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                 VerticalContentAlignment="Stretch">
+            <ItemsControl.ItemContainerStyle>
+                <Style TargetType="{x:Type ListBoxItem}">
+                    <Setter Property="controls:TimeLinePanel.Slot" Value="{Binding Slot}" />
+                    <Setter Property="controls:TimeLinePanel.ItemValue" Value="{Binding TotalCallCount, Mode=OneWay}" />
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0"/>
+                </Style>
+            </ItemsControl.ItemContainerStyle>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Rectangle Width="10" HorizontalAlignment="Stretch" Fill="Blue" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <controls:TimeLinePanel SlotCount="{Binding Path=SlotCount}" />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+        </ListBox>
+    </Grid>
+</UserControl>

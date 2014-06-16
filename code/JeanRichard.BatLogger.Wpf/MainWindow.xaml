@@ -5,8 +5,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:jr="clr-namespace:JeanRichard.BatLogger.Wpf.ViewModels"
+        xmlns:controls="clr-namespace:JeanRichard.BatLogger.Wpf.Controls"
         Title="MainWindow" Height="350" Width="525"
-        d:DataContext="{d:DesignInstance jr:BatModel, IsDesignTimeCreatable=True}"
+        d:DataContext="{d:DesignInstance jr:BatModelDesign, IsDesignTimeCreatable=True}"
         mc:Ignorable="d"
         >
     
@@ -40,7 +41,7 @@
                             </VisualStateManager.VisualStateGroups>
                             <Path x:Name="selectedPath" Fill="White" Opacity="0">
                                 <Path.Data>
-                                    <EllipseGeometry RadiusX="{Binding CallCount}" RadiusY="{Binding CallCount}"/>
+                                    <EllipseGeometry RadiusX="15" RadiusY="15"/>
                                 </Path.Data>
                             </Path>
                             <Path StrokeThickness="2" Fill="Transparent">
@@ -48,7 +49,7 @@
                                     <SolidColorBrush Color="DarkRed"/>
                                 </Path.Stroke>
                                 <Path.Data>
-                                    <EllipseGeometry RadiusX="{Binding CallCount}" RadiusY="{Binding CallCount}"/>
+                                    <EllipseGeometry RadiusX="15" RadiusY="15"/>
                                 </Path.Data>
                             </Path>
                             <!--<Grid Canvas.Left="15" Canvas.Top="-8">
@@ -61,10 +62,6 @@
             </Setter>
             <!--<EventSetter Event="TouchDown" Handler="MapItemTouchDown"/>-->
         </Style>
-
-        <!--<map:ImageTileSource x:Key="mySource"></map:ImageTileSource>
-        <map:TileLayer x:Key="SeamarksTileLayer" SourceName="Seamarks" TileSource="{StaticResource mySource}" MinZoomLevel="10" MaxZoomLevel="18"/>-->
-
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -72,26 +69,23 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <map:Map Grid.Row="0" x:Name="map" ZoomLevel="17" Center="47.4035,8.058">
-            <map:MapItemsControl x:Name="mapItems" ItemsSource="{Binding BatLocations}"
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="150"/>
+        </Grid.ColumnDefinitions>
+        <map:Map Grid.Row="0" ZoomLevel="17" Center="47.4035,8.058">
+            <map:MapItemsControl x:Name="MapItems" ItemsSource="{Binding BatLocations}"
                                  ItemContainerStyle="{StaticResource PointItemStyle}"
                                  IsSynchronizedWithCurrentItem="True"
-                                 SelectionMode="Extended"/>
+                                 SelectionMode="Multiple"/>
         </map:Map>
         
-        <Slider Grid.Row="1" Value="{Binding Time, Mode=OneWayToSource}"></Slider>
-
-        <ItemsControl Grid.Row="2" Height="50px" ItemsSource="{Binding ElementName=mapItems, Path=Items.CurrentItem.Sightings}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Label>test</Label>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal"/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-        </ItemsControl>
+        <Slider Grid.Row="1" Grid.Column="0" Value="{Binding Time, Mode=OneWayToSource}"></Slider>
+        <controls:TimeLine Grid.Row="2" Grid.Column="0" Height="100px" x:Name="TimeLine" ItemsSource="{Binding ElementName=MapItems, Path=Items.CurrentItem.Calls}" />
+        
+        <GridSplitter Grid.Column="1" Grid.Row="0" Grid.RowSpan="3" Width="5" VerticalAlignment="Stretch" HorizontalAlignment="Center" />
+        
+        <controls:BatLocationPanel Grid.Row="0" Grid.Column="2" Grid.RowSpan="3" DataContext="{Binding ElementName=TimeLine, Path=SelectedItem}" />
     </Grid>
 </Window>
