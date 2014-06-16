@@ -1,32 +1,26 @@
-//#define DEBUG
 //#define RTC_ENABLED
 
 #include <SdFat.h>
-SdFat sd;
+#include <EEPROM.h>
+#include <avr/wdt.h>
+#include <avr/sleep.h>
 
-#ifdef RTC_ENABLED
-  #include <Wire.h>
-  #include "RTClib.h"
-  RTC_DS1307 RTC;
-#endif
+#include "BatLog.h"
+#include "BatLib.h"
 
+//#ifdef RTC_ENABLED
+//#include <Wire.h>
+//#include "RTClib.h"
+//RTC_DS1307 RTC;
+//#endif
 
-//Board configuration
-const int BatInputPin = 2;
-const int Button1Pin = 8;
-const int Button2Pin = 9;
-
-const int GreenLedPin = 5;
-const int YellowLedPin = 6;
-const int RedLedPin = 7;
-
-const int SDShieldSwitchPin = 3;
-const int SDPin = 10;
+BatLog Log;
+BatBoardClass BatBoard;
 
 //Time of Silence to detect End of Call in microseconds
 const int CallEndTimeout = 5000;
 
-// Interrupt Variablen um BatInputs zu zÃ¤hlen
+// Interrupt Variablen um BatInputs zu zählen
 volatile int pulses = 0;
 volatile unsigned long callStartMicro;
 volatile unsigned long callStartMillis;
@@ -40,220 +34,221 @@ byte pulseStore[LogBufferSize];
 unsigned int durationStore[LogBufferSize];
 unsigned long startTimeStore[LogBufferSize];
 
-char filename[] = "LOG--.CSV";
+bool isLogging = false;
 
-void setup()
-{
-  pinMode(BatInputPin, INPUT);
-  pinMode(Button1Pin, INPUT);
-  digitalWrite(Button1Pin, HIGH);
-  pinMode(Button2Pin, INPUT);
-  digitalWrite(Button2Pin, HIGH);
-  pinMode(YellowLedPin, OUTPUT);
-  pinMode(RedLedPin, OUTPUT);
-  pinMode(GreenLedPin, OUTPUT);
-  pinMode(SDShieldSwitchPin, OUTPUT);
-  analogReference( DEFAULT );
-
-#ifdef DEBUG
-  Serial.begin(57600);
-#endif
-
-  attachInterrupt(0, callInterrupt, CHANGE); 
-
-  SdFile file = openLogFile();
-  file.println("#StartUp completed");
-  closeLogFile(file);
-
-  indicatorMode();
-}
+unsigned long lastLowCall;
+unsigned long lastMidCall;
+unsigned long lastHighCall;
 
 void loop()
 {
-  pulses = 0;
+	pulses = 0;
 
-  int tempPulses = 0;
-  while(pulses == 0 || pulses > tempPulses || (micros() - lastCallMicro) < CallEndTimeout){
-    if (digitalRead(Button2Pin) == LOW){
-      writeBufferToLog();
-      indicatorMode();
-    }
-    tempPulses = pulses;
-    delay(1);
-  }
+	int tempPulses = 0;
+	while (pulses == 0 || pulses > tempPulses || (micros() - lastCallMicro) < CallEndTimeout){
+		if (digitalRead(PIN_S2) == LOW){
+			toggleIndicatorMode();
+		}
+		tempPulses = pulses;
+		checkVcc();
+		if (!isLogging){
+			updateIndicatorLed(PIN_LED_GREEN, lastHighCall);
+			updateIndicatorLed(PIN_LED_YELLOW, lastMidCall);
+			updateIndicatorLed(PIN_LED_RED, lastLowCall);
+		}
+	}
 
-  digitalWrite(GreenLedPin, LOW);
-  int diff = lastCallMicro - callStartMicro;
-  if (tempPulses > 1 && diff > 0)
-  {
-    int f = (tempPulses * 16) / (diff / 1000);
-    if (f > 5){
-      digitalWrite(GreenLedPin, HIGH);
-      pulseStore[index] = tempPulses;
-      durationStore[index] = diff;
-      startTimeStore[index] = callStartMillis;
+	unsigned int diff = lastCallMicro - callStartMicro;
+	if (tempPulses > 1 && diff > 0)
+	{
+		unsigned int f = (tempPulses * 16 * 1000000L)  / diff;
+		if (isLogging)
+		{
+			if (f > 2000) 
+			{
+				store(tempPulses, diff, callStartMillis);
+			}
+		}
+		else
+		{
+			indicate(f);
+		}
+	}
 
-      index++;
-      if (index >= LogBufferSize){
-        writeBufferToLog();
-      } 
-    }
-  }
 }
 
-void indicatorMode()
-{
-  boolean abort = false;
+void store(byte pulseCount, unsigned int duration, unsigned long startMs){
+	pulseStore[index] = pulseCount;
+	durationStore[index] = duration;
+	startTimeStore[index] = startMs;
 
-  setLeds(LOW, LOW, HIGH);
-  delay(250);
-  setLeds(LOW, HIGH, HIGH);
-  delay(250);
-  setLeds(HIGH, HIGH, HIGH);
-  delay(250);
-  setLeds(LOW, LOW, LOW);
-  callStartMillis = 0;
+	index++;
+	if (index >= LogBufferSize){
+		writeBufferToLog();
+	}
 
-  while(!abort)
-  {
-    unsigned long diff = millis() - callStartMillis;
-    pulses=0;
-    if (diff < 5){
-      setLeds(HIGH, HIGH, HIGH);
-    } 
-    else if (diff < 150){
-      setLeds(LOW, HIGH, HIGH);
-    }
-    else if (diff < 300){
-      setLeds(LOW, LOW, HIGH);
-    } 
-    else {
-      setLeds(LOW, LOW, LOW);
-    }
-    abort = digitalRead(Button1Pin) == LOW;
-  }
-  setLeds(HIGH, HIGH, HIGH);
-  delay(250);
-  setLeds(HIGH, HIGH, LOW);
-  delay(250);
-  setLeds(HIGH, LOW, LOW);
-  delay(250);
-  setLeds(LOW, LOW, LOW);
 }
 
-// == Writes the Memory-Buffer to the LogFile and clears the Buffer.
-void writeBufferToLog()
+void indicate(unsigned int f)
 {
-  SdFile logfile = openLogFile();
-  for (int i = 0; i < index; i++){
-    logfile.print(startTimeStore[i]);
-    logfile.print(';');
-    logfile.print(pulseStore[i]);
-    logfile.print(';');
-    logfile.println(durationStore[i]);
-  }
-  closeLogFile(logfile);
-  index = 0;
+	if (f < 5000) {
+		lastLowCall = millis();
+		updateIndicatorLed(PIN_LED_RED, lastLowCall);
+	}
+	else if (f < 20000) {
+		lastMidCall = millis();
+		updateIndicatorLed(PIN_LED_YELLOW, lastMidCall);
+	}
+	else {
+		lastHighCall = millis();
+		updateIndicatorLed(PIN_LED_GREEN, lastHighCall);
+	}
+}
+
+void updateIndicatorLed(int pin, unsigned long lastCall)
+{
+	unsigned long diff = millis() - lastCall;
+
+	if (diff > 500){
+		digitalWrite(pin, LOW);
+		return;
+	}
+
+	byte value = 255 - (diff / 2);
+	analogWrite(pin, value);
+}
+
+void toggleIndicatorMode()
+{
+	if (isLogging){
+		writeBufferToLog();
+		isLogging = false;
+		lastHighCall = 0;
+		lastMidCall = 0;
+		lastLowCall = 0;
+		BatLib_SetLeds(false, false, true);
+		delay(250);
+		BatLib_SetLeds(false, true, true);
+		delay(250);
+		BatLib_SetLeds(true, true, true);
+		delay(250);
+		BatLib_SetLeds(false, false, false);
+	}
+	else
+	{
+		isLogging = true;
+		BatLib_SetLeds(true, true, true);
+		delay(250);
+		BatLib_SetLeds(true, true, false);
+		delay(250);
+		BatLib_SetLeds(true, false, false);
+		delay(250);
+		BatLib_SetLeds(false, false, false);
+	}
+}
+
+void setup()
+{
+	//Serial.begin(9600);
+
+	// Disable unneeded devices
+	// 7 - PRTWI: Power Reduction TWI
+	// 6 - PRTIM2 : Power Reduction Timer / Counter2
+	// 5 - PRTIM0 : Power Reduction Timer / Counter0
+	// 4 - Res : Reserved bit
+	// 3 - PRTIM1 : Power Reduction Timer / Counter1
+	// 2 - PRSPI : Power Reduction Serial Peripheral Interface
+	// 1 - PRUSART0 : Power Reduction USART0
+	// 0 - PRADC : Power Reduction ADC
+	//PRR = B11011010;
+
+	BatBoard.init();
+	Log.init(PIN_LED_YELLOW);
+
+	Log.start();
+	Log.printf(PSTR("#start time;pulses;duration"));
+	Log.stop();
+
+	attachInterrupt(0, callInterrupt, CHANGE);
+}
+
+void checkVcc()
+{
+	long vcc = BatBoard.getVcc();
+	if (vcc < 3800){
+		writeBufferToLog();
+		Log.start();
+		Log.printf(PSTR("# %lu -> Power failure: %li mV"), millis(), vcc);
+		Log.stop();
+		while (true){
+			analogWrite(PIN_LED_YELLOW, 50);
+			delay(500);
+			digitalWrite(PIN_LED_YELLOW, LOW);
+			sleep();
+		}
+	}
 }
 
 // == Interrupt Method to count Bat-Calls
 void callInterrupt()
 {
-  if (pulses == 0)
-  {
-    callStartMicro = micros();
-    callStartMillis = millis();
-  }
-  lastCallMicro = micros();
-  pulses++;
+	if (pulses == 0)
+	{
+		callStartMicro = micros();
+		callStartMillis = millis();
+	}
+	lastCallMicro = micros();
+	pulses++;
 }
 
-// == Opens the Logfile (and initializes if new)
-SdFile openLogFile(){
-  digitalWrite(YellowLedPin, HIGH);
-  digitalWrite(SDShieldSwitchPin, HIGH);
-  delay(200);
 
-  if (!sd.begin(SDPin, SPI_FULL_SPEED)){
-    error(3);
-  }
-
-  SdFile logfile;
-  if (!sd.exists(filename)) {
-    logfile = initializeNewLog();
-  } 
-  else if (!logfile.open(filename, O_RDWR | O_CREAT | O_AT_END)) {
-    error(4);
-  } 
-  return logfile;
-}
-
-// == Closes LogFile and turns the LED and the SD Module off.
-void closeLogFile(SdFile logfile)
+// == Writes the Memory-Buffer to the LogFile and clears the Buffer.
+void writeBufferToLog()
 {
-  logfile.close();
-  delay(200);
-  digitalWrite(SDShieldSwitchPin, LOW);
-  digitalWrite(YellowLedPin, LOW);
+	Log.start();
+	for (int i = 0; i < index; i++){
+		Log.printf(PSTR("%lu;%hhu;%u"), startTimeStore[i], pulseStore[i], durationStore[i]);
+	}
+	Log.stop();
+	index = 0;
 }
 
-// == Initializese a new LogFile with Headers.
-SdFile initializeNewLog()
+// Put Arduino to deep Sleep for 8 secs
+void sleep()
 {
-  SdFile logfile;
-  for (int i = 0; i < 100; i++) {
-    filename[3] = i/10 + '0';
-    filename[4] = i%10 + '0';
-    if (!sd.exists(filename)) {
-      if (!logfile.open(filename, O_RDWR | O_CREAT | O_AT_END)) {
-        error(4);
-      } 
-      break;
-    }
-  }
+	BatLib_SetLeds(false, false, false);
+	detachInterrupt(0);
 
-#ifdef RTC_ENABLED
-  RTC.begin();
+	byte oldAdcsra = ADCSRA;
 
-  if (! RTC.isrunning()) {
-    error(1);
-  }
-#endif
+	//disable ADC
+	ADCSRA = 0;
+	// clear various "reset" flags
+	MCUSR = 0;
+	// allow changes, disable reset
+	WDTCSR = bit(WDCE) | bit(WDE);
+	// set interrupt mode and an interval 
+	WDTCSR = bit(WDIE) | bit(WDP3) | bit(WDP0);    // set WDIE, and 8 seconds delay
+	wdt_reset();  // pat the dog
 
-  unsigned long nowMillis = millis();
-  char buffer[150];
+	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+	sleep_enable();
 
-#ifdef RTC_ENABLED
-  DateTime now = RTC.now();
-  sprintf_P(buffer, PSTR("#%lu;%02d/%02d/%02d %02d:%02d:%02d"), nowMillis, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-  logfile.println(buffer);
-#endif
+	// turn off brown-out enable in software
+	MCUCR = bit(BODS) | bit(BODSE);
+	MCUCR = bit(BODS);
+	sleep_cpu();
 
-  sprintf_P(buffer, PSTR("#start time;pulses;duration"));
-  logfile.println(buffer);
-  return logfile;
+	// cancel sleep as a precaution
+	sleep_disable();
+
+	//Restore Values
+	ADCSRA = oldAdcsra;
+	attachInterrupt(0, callInterrupt, CHANGE);
 }
 
-// == Stops PrgrammExecution and Reports the ErrorCode with the red LED
-void error(int code){
-  while(true)
-  {
-    for(int i=0; i < code; i++){
-      digitalWrite(RedLedPin, HIGH);
-      delay(250);
-      digitalWrite(RedLedPin, LOW);
-      delay(500);
-    }    
-    delay(2000);
-  };
+// Watchdog timer interrupt.
+ISR(WDT_vect)
+{
+	wdt_disable();
 }
-
-// == Helper Method to Set the State of all LEDs
-void setLeds(int green, int yellow, int red){
-  digitalWrite(GreenLedPin, green);
-  digitalWrite(YellowLedPin, yellow);
-  digitalWrite(RedLedPin, red);
-}
-
-
-
