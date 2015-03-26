@@ -26,7 +26,7 @@ unsigned int loudSeries[LogBufferSize];
 int seriesIndex = 0;
 
 
-//char filename[] = "LOG--.CSV";
+char filename[] = "LOG--.CSV";
 
 
 unsigned long readCounter(){
@@ -68,9 +68,9 @@ void setup()
 
 	pinMode(A0, INPUT);
 
-	/*SdFile file = openLogFile();
+	SdFile file = openLogFile();
 	file.println("#StartUp completed");
-	closeLogFile(file);*/
+	closeLogFile(file);
 
 	initCounter();
 }
@@ -100,7 +100,8 @@ void loop()
                   unsigned long diff = time - startTime;
                   if (sum > 0 && maxFreqKhz > 9 && diff > 5000){
                     //logData(sum, startTime, diff, maxFreqKhz, loud);
-                    logSeries();
+                    writeSeries();
+                    //logSeries();
                   }
                   sum = 0;
                   maxFreqKhz = 0;
@@ -122,58 +123,16 @@ void loop()
                 if (freqKhz > maxFreqKhz){
                   maxFreqKhz = freqKhz;
                 }
-                
-/*                if (freqKhz < maxFreqKhz / 4){
-                  //logData(sum, startTime, diff, maxFreqKhz, loud);
-                  logSeries();
-                  sum = 0;
-                  maxFreqKhz = 0;
-                  continue;
-                }
-*/
-                seriesIndex++;
+
+                seriesIndex = (seriesIndex + 1) % LogBufferSize;
                 lastTime=time;
-/*                
-                if (maxFreqKhz > 25UL){
-		  led = PIN_LED_GREEN;
-		}
-		else if (maxFreqKhz > 15UL){
-		  led = PIN_LED_YELLOW;
-		}
-		else
-		{
-		  led = PIN_LED_RED;
-		}
-		if (led > 0) {
-                  digitalWrite(led, HIGH);
-                }
-*/
 	}
 }
-/*
-void logData(unsigned long sum, unsigned long startTime, unsigned long diff, unsigned int maxFreqKhz, int loud)
-{
-  Serial.print(maxFreqKhz);
-  Serial.print(" - ");
-  Serial.print(loud);
-  Serial.print(" - ");
-  Serial.print(diff);
-  Serial.print(" - ");
-  Serial.println(sum);
-  
-  /*pulseStore[index] = sum;
-  durationStore[index] = diff;
-  startTimeStore[index] = startTime;
-  maxFreqStore[index] = maxFreqKhz;
-  index++;
-  if (index >= LogBufferSize){
-    writeBufferToLog();
-  }
-}
-*/
+
 void logSeries(){
+  digitalWrite(PIN_LED_RED, HIGH);
   Serial.println("------------------------------");
-  for (int i = 0; i < seriesIndex; i++){
+  for (int i = 0; i < seriesIndex && i < LogBufferSize; i++){
     Serial.print(i);
     Serial.print(';');
     Serial.print(timeSeries[i]);
@@ -182,33 +141,34 @@ void logSeries(){
     Serial.print(';');
     Serial.println(loudSeries[i]);
   }
+  digitalWrite(PIN_LED_RED, LOW);
 }
-/*
-// == Writes the Memory-Buffer to the LogFile and clears the Buffer.
-void writeBufferToLog()
-{
-  SdFile logfile = openLogFile();
-  for (int i = 0; i < index; i++){
-    logfile.print(startTimeStore[i]);
-    logfile.print(';');
-    logfile.print(pulseStore[i]);
-    logfile.print(';');
-    logfile.print(durationStore[i]);
-    logfile.print(';');
-    logfile.println(maxFreqStore[i]);
+
+void writeSeries(){
+  digitalWrite(PIN_LED_RED, HIGH);
+  SdFile file = openLogFile();
+  file.println("--------");
+  for (int i = 0; i < seriesIndex && i < LogBufferSize; i++){
+    file.print(i);
+    file.print(';');
+    file.print(timeSeries[i]);
+    file.print(';');
+    file.print(pulseSeries[i]);
+    file.print(';');
+    file.println(loudSeries[i]);
   }
-  closeLogFile(logfile);
-  index = 0;
+  closeLogFile(file);
+  digitalWrite(PIN_LED_RED, LOW);
 }
 
 // == Opens the Logfile (and initializes if new)
 SdFile openLogFile(){
-  digitalWrite(PIN_LED_RED, HIGH);
+/*  digitalWrite(PIN_LED_RED, HIGH);
   digitalWrite(SDShieldSwitchPin, HIGH);
   delay(200);
-
+*/
   if (!sd.begin(SDPin, SPI_FULL_SPEED)){
-    error(3);
+    Serial.println("SD-Init failed.");
   }
 
   SdFile logfile;
@@ -216,7 +176,7 @@ SdFile openLogFile(){
     logfile = initializeNewLog();
   } 
   else if (!logfile.open(filename, O_RDWR | O_CREAT | O_AT_END)) {
-    error(4);
+    Serial.println("SDOpen failed.");
   } 
   return logfile;
 }
@@ -225,9 +185,9 @@ SdFile openLogFile(){
 void closeLogFile(SdFile logfile)
 {
   logfile.close();
-  delay(200);
+  /*delay(200);
   digitalWrite(SDShieldSwitchPin, LOW);
-  digitalWrite(PIN_LED_RED, LOW);
+  digitalWrite(PIN_LED_RED, LOW);*/
 }
 
 // == Initializese a new LogFile with Headers.
@@ -239,7 +199,7 @@ SdFile initializeNewLog()
     filename[4] = i%10 + '0';
     if (!sd.exists(filename)) {
       if (!logfile.open(filename, O_RDWR | O_CREAT | O_AT_END)) {
-        error(4);
+        Serial.println("SDOpen (2) failed.");
       } 
       break;
     }
@@ -253,17 +213,3 @@ SdFile initializeNewLog()
   return logfile;
 }
 
-// == Stops PrgrammExecution and Reports the ErrorCode with the red LED
-void error(int code){
-  while(true)
-  {
-    for(int i=0; i < code; i++){
-      digitalWrite(PIN_LED_RED, HIGH);
-      delay(250);
-      digitalWrite(PIN_LED_RED, LOW);
-      delay(500);
-    }    
-    delay(2000);
-  };
-}
-*/

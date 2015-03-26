@@ -859,7 +859,7 @@ chip</description>
 </symbol>
 </symbols>
 <devicesets>
-<deviceset name="SPU0410LR5H">
+<deviceset name="SPU0410LR5H" prefix="U">
 <gates>
 <gate name="G$1" symbol="SPU0410LR5H" x="0" y="0"/>
 </gates>
@@ -1031,7 +1031,7 @@ Basic schematic elements and footprints for 0603, 1206, and PTH resistors.</desc
 </device>
 </devices>
 </deviceset>
-<deviceset name="LMV339">
+<deviceset name="LMV339" prefix="U">
 <description>LMV339 Comparator</description>
 <gates>
 <gate name="G$1" symbol="OP-AMP+-" x="0" y="0"/>
@@ -1051,7 +1051,7 @@ Basic schematic elements and footprints for 0603, 1206, and PTH resistors.</desc
 </device>
 </devices>
 </deviceset>
-<deviceset name="MAX756">
+<deviceset name="MAX756" prefix="U">
 <gates>
 <gate name="G$1" symbol="MAX756" x="-5.08" y="7.62"/>
 </gates>

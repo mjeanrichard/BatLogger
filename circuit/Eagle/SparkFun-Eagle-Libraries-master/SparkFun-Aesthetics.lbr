@@ -69735,7 +69735,7 @@ Standard A4 size frame in Landscape</description>
 </device>
 </devices>
 </deviceset>
-<deviceset name="AGND">
+<deviceset name="AGND" prefix="X">
 <gates>
 <gate name="G$1" symbol="AGND" x="0" y="0"/>
 </gates>

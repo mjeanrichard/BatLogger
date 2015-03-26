@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="6.4">
+<eagle version="7.1.0">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -3314,7 +3314,7 @@ SFE parts COM-10855 (330), COM-10856 (10K)&lt;br&gt;</description>
 </device>
 </devices>
 </deviceset>
-<deviceset name="SUPPLY_CONNECT">
+<deviceset name="SUPPLY_CONNECT" prefix="X">
 <gates>
 <gate name="G$1" symbol="SUPPLY_CONNECT" x="0" y="0"/>
 </gates>

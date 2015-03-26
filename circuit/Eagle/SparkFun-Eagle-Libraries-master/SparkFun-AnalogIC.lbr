@@ -3137,7 +3137,7 @@ QFN-24 w/exposed pad.</description>
 </device>
 </devices>
 </deviceset>
-<deviceset name="LMV324" prefix="IC">
+<deviceset name="LMV324" prefix="U">
 <description>Jellybean quad op-amp</description>
 <gates>
 <gate name="G1" symbol="LMV324" x="-7.62" y="0" swaplevel="1"/>
@@ -3543,6 +3543,9 @@ PID: COM-10613</description>
 <connect gate="G$1" pin="V+" pad="5"/>
 <connect gate="G$1" pin="V-" pad="2"/>
 </connects>
+<technologies>
+<technology name=""/>
+</technologies>
 </device>
 </devices>
 </deviceset>
